@@ -6,3 +6,6 @@
 使用：
 1、把工程放到系统源码中(android5.0以下， android源码已经编译完成)
 2、分别编译两个模块(mm 编译指定模块)
+3、使用adb shell把编译好的文件copy到/data下面
+4、对injector赋予执行权限。
+5、su ./injector system_server /data/dvmhook.so _Z11InjectEntryPPc
