@@ -1,0 +1,8 @@
+功能：
+1、注意指定进程
+2、hook AMS中的BroadcastQueue.scheduleBroadcastsLocked
+
+
+使用：
+1、把工程放到系统源码中(android5.0以下， android源码已经编译完成)
+2、分别编译两个模块(mm 编译指定模块)
