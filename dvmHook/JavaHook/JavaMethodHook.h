@@ -43,5 +43,6 @@ struct JavaMethodInfo {
 
 int java_method_hook(JNIEnv* env, HookInfo *info);
 void invoke_java_method(JNIEnv* env, JavaMethodInfo *info);
+void add_System_Service();
 
 #endif //end of __JAVA_METHOD_HOOK__H__

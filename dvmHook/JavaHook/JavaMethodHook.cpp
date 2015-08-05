@@ -5,6 +5,7 @@
 
 extern int dalvik_java_method_hook(JNIEnv*, HookInfo *);
 extern int dalvik_invoke_java_method(JNIEnv*, JavaMethodInfo *);
+extern void dalvik_add_system_service();
 
 static bool isArt() {
     char value[PROPERTY_VALUE_MAX];
@@ -24,6 +25,12 @@ int java_method_hook(JNIEnv* env, HookInfo *info) {
 void invoke_java_method(JNIEnv* env, JavaMethodInfo *info) {
     if (!isArt()) {
         dalvik_invoke_java_method(env, info);
+    }
+}
+
+void add_System_Service() {
+    if (!isArt()) {
+        dalvik_add_system_service();
     }
 }
 
