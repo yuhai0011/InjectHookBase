@@ -25,51 +25,12 @@ extern "C" jint Java_com_futureagent_injecthooktrojan_HookUtils_hookMethodNative
     get_cstr_from_jstring(env, methodsig, &info->methodSig);
 
     info->isStaticMethod = isstatic == JNI_TRUE;
-    return java_method_hook(env, info);
-}
-
-void hookBroadcastMethod() {
-    LOGI("skywalker hookBroadcastMethod enter");
-    const char *cls = "com/android/server/am/BroadcastQueue";
-    const char *fun = "scheduleBroadcastsLocked";
-    const char *funsig = "()V";
-
-    JNIEnv* env = android::AndroidRuntime::getJNIEnv();
-    HookInfo *info = (HookInfo *) malloc(sizeof(HookInfo));
-
-    info->classDesc = cls;
-    info->methodName = fun;
-    info->methodSig = funsig;
-    info->isStaticMethod = false;
-
-    java_method_hook(env, info);
-}
-
-void hookStartServiceMethod() {
-    LOGI("skywalker hookStartServiceMethod enter");
-    const char *cls = "com/android/server/am/ActiveServices";
-    const char *fun = "retrieveServiceLocked";
-    const char *funsig =
-            "(Landroid/content/Intent;Ljava/lang/String;IIIZZ)Lcom/android/server/am/ActiveServices/ServiceLookupResult;";
-
-    JNIEnv* env = android::AndroidRuntime::getJNIEnv();
-    HookInfo *info = (HookInfo *) malloc(sizeof(HookInfo));
-
-    info->classDesc = cls;
-    info->methodName = fun;
-    info->methodSig = funsig;
-    info->isStaticMethod = false;
-    //java_method_hook(env, info);
-}
-
-void hookMethodNative() {
-    LOGI("skywalker hookMethodNative enter");
-    hookBroadcastMethod();
-    hookStartServiceMethod();
+    //return dalvik_method_hook(env, info);
+    return 0;
 }
 
 void InjectEntry(char** args) {
     LOGI("skywalker: I am in InjectEntry");
     add_System_Service();
-    hookMethodNative();
+    dalvik_method_hook();
 }

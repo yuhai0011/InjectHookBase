@@ -41,8 +41,7 @@ struct JavaMethodInfo {
     bool isStaticMethod;
 };
 
-int java_method_hook(JNIEnv* env, HookInfo *info);
-void invoke_java_method(JNIEnv* env, JavaMethodInfo *info);
+int dalvik_method_hook();
 void add_System_Service();
 
 #endif //end of __JAVA_METHOD_HOOK__H__

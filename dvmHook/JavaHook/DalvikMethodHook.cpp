@@ -12,7 +12,7 @@ using android::AndroidRuntime;
 #define STATIC static
 #endif
 
-STATIC int calcMethodArgsSize(const char* shorty) {
+extern STATIC int calcMethodArgsSize(const char* shorty) {
     int count = 0;
 
     /* Skip the return type. */
@@ -38,7 +38,7 @@ STATIC int calcMethodArgsSize(const char* shorty) {
     return count;
 }
 
-STATIC u4 dvmPlatformInvokeHints(const char* shorty) {
+extern STATIC u4 dvmPlatformInvokeHints(const char* shorty) {
     const char* sig = shorty;
     int padFlags, jniHints;
     char sigByte;
@@ -87,7 +87,7 @@ STATIC u4 dvmPlatformInvokeHints(const char* shorty) {
     return jniHints;
 }
 
-STATIC int dvmComputeJniArgInfo(const char* shorty) {
+extern STATIC int dvmComputeJniArgInfo(const char* shorty) {
     const char* sig = shorty;
     int returnType, jniArgInfo;
     u4 hints;
@@ -135,7 +135,7 @@ STATIC int dvmComputeJniArgInfo(const char* shorty) {
     return jniArgInfo;
 }
 
-STATIC jclass dvmFindJNIClass(JNIEnv *env, const char *classDesc) {
+extern STATIC jclass dvmFindJNIClass(JNIEnv *env, const char *classDesc) {
     jclass classObj = env->FindClass(classDesc);
     if (env->ExceptionCheck() == JNI_TRUE) {
         env->ExceptionClear();
@@ -180,7 +180,7 @@ STATIC jclass dvmFindJNIClass(JNIEnv *env, const char *classDesc) {
     return (jclass) env->NewGlobalRef(classObj);
 }
 
-STATIC ClassObject* dvmFindClass(const char *classDesc) {
+extern STATIC ClassObject* dvmFindClass(const char *classDesc) {
     JNIEnv *env = AndroidRuntime::getJNIEnv();
     assert(env != NULL);
 
@@ -195,7 +195,7 @@ STATIC ClassObject* dvmFindClass(const char *classDesc) {
     return res;
 }
 
-STATIC ArrayObject* dvmBoxMethodArgs(const Method* method, const u4* args) {
+extern STATIC ArrayObject* dvmBoxMethodArgs(const Method* method, const u4* args) {
     const char* desc = &method->shorty[1]; // [0] is the return type.
 
     /* count args */
@@ -252,7 +252,7 @@ STATIC ArrayObject* dvmBoxMethodArgs(const Method* method, const u4* args) {
     return argArray;
 }
 
-STATIC ArrayObject* dvmGetMethodParamTypes(const Method* method, const char* methodsig) {
+extern STATIC ArrayObject* dvmGetMethodParamTypes(const Method* method, const char* methodsig) {
     /* count args */
     size_t argCount = dexProtoGetParameterCount(&method->prototype);
     STATIC ClassObject* java_lang_object_array = dvmFindSystemClass("[Ljava/lang/Object;");
@@ -396,238 +396,6 @@ static void dalvik_invoke_java_static_method_direct(JavaMethodInfo *info) {
     env->DeleteLocalRef(javaClassName);
 }
 
-jclass javaClientClassGlobal = NULL;
-jmethodID injectMethodGlobal = NULL;
-static void init_global_class_and_method(JavaMethodInfo *info) {
-    JNIEnv* env = android::AndroidRuntime::getJNIEnv();
-
-    jstring dexpath = env->NewStringUTF(info->jarPath);
-    jstring dex_odex_path = env->NewStringUTF("/data/dalvik-cache/");
-    jstring javaClassName = env->NewStringUTF(info->classDesc);
-    const char* func = info->methodName;
-    const char* funcSig = info->methodSig;
-
-    //找到ClassLoader类
-    jclass classloaderClass = env->FindClass("java/lang/ClassLoader");
-    if (NULL == classloaderClass) {
-        env->DeleteLocalRef(dexpath);
-        env->DeleteLocalRef(dex_odex_path);
-        env->DeleteLocalRef(javaClassName);
-        return;
-    }
-    jmethodID getsysloaderMethod = env->GetStaticMethodID(classloaderClass, "getSystemClassLoader",
-            "()Ljava/lang/ClassLoader;");
-    if (NULL == getsysloaderMethod) {
-        env->DeleteLocalRef(dexpath);
-        env->DeleteLocalRef(dex_odex_path);
-        env->DeleteLocalRef(javaClassName);
-        return;
-    }
-
-    jobject loader = env->CallStaticObjectMethod(classloaderClass, getsysloaderMethod);
-    if (NULL == loader) {
-        env->DeleteLocalRef(dexpath);
-        env->DeleteLocalRef(dex_odex_path);
-        env->DeleteLocalRef(javaClassName);
-        return;
-    }
-    //找到DexClassLoader类
-    jclass dexLoaderClass = env->FindClass("dalvik/system/DexClassLoader");
-    if (NULL == dexLoaderClass) {
-        env->DeleteLocalRef(dexpath);
-        env->DeleteLocalRef(dex_odex_path);
-        env->DeleteLocalRef(javaClassName);
-        return;
-    }
-
-    jmethodID initDexLoaderMethod = env->GetMethodID(dexLoaderClass, "<init>",
-            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/ClassLoader;)V");
-    if (NULL == initDexLoaderMethod) {
-        env->DeleteLocalRef(dexpath);
-        env->DeleteLocalRef(dex_odex_path);
-        env->DeleteLocalRef(javaClassName);
-        return;
-    }
-
-    //新建一个DexClassLoader对象
-    jobject dexLoader = env->NewObject(dexLoaderClass, initDexLoaderMethod, dexpath, dex_odex_path,
-            NULL, loader);
-    if (NULL == dexLoader) {
-        env->DeleteLocalRef(dexpath);
-        env->DeleteLocalRef(dex_odex_path);
-        env->DeleteLocalRef(javaClassName);
-        return;
-    }
-    //找到DexClassLoader中的方法findClass
-    jmethodID findclassMethod = env->GetMethodID(dexLoaderClass, "findClass",
-            "(Ljava/lang/String;)Ljava/lang/Class;");
-    //说明：老版本的SDK中DexClassLoader有findClass方法，新版本SDK中是loadClass方法
-    if (NULL == findclassMethod) {
-        findclassMethod = env->GetMethodID(dexLoaderClass, "loadClass",
-                "(Ljava/lang/String;)Ljava/lang/Class;");
-    }
-    if (NULL == findclassMethod) {
-        env->DeleteLocalRef(dexpath);
-        env->DeleteLocalRef(dex_odex_path);
-        env->DeleteLocalRef(javaClassName);
-        return;
-    }
-
-    //调用DexClassLoader的loadClass方法，加载需要调用的类
-    jclass javaClientClass = (jclass) env->CallObjectMethod(dexLoader, findclassMethod,
-            javaClassName);
-    if (NULL == javaClientClass) {
-        env->DeleteLocalRef(dexpath);
-        env->DeleteLocalRef(dex_odex_path);
-        env->DeleteLocalRef(javaClassName);
-        return;
-    }
-
-    //获取加载的类中的方法
-    jmethodID inject_method = env->GetStaticMethodID(javaClientClass, func, funcSig);
-    if (NULL == inject_method) {
-        env->DeleteLocalRef(dexpath);
-        env->DeleteLocalRef(dex_odex_path);
-        env->DeleteLocalRef(javaClassName);
-        return;
-    }
-    //调用加载的类中的静态方法
-    env->CallStaticVoidMethod(javaClientClass, inject_method);
-    javaClientClassGlobal = env->NewGlobalRef(javaClientClass);
-    injectMethodGlobal = inject_method; //env->NewGlobalRef(inject_method);
-
-    env->DeleteLocalRef(dexpath);
-    env->DeleteLocalRef(dex_odex_path);
-    env->DeleteLocalRef(javaClassName);
-}
-
-static void dalvik_invoke_java_static_method(JavaMethodInfo *info) {
-    JNIEnv* env = android::AndroidRuntime::getJNIEnv();
-    LOGI( "skywalker  dalvik_invoke_java_static_method enter");
-    if (NULL == javaClientClassGlobal || NULL == injectMethodGlobal) {
-        LOGI(
-                "skywalker  dalvik_invoke_java_static_method is null or injectMethodGlobal is null, init...");
-        init_global_class_and_method(info);
-    }
-    if (NULL == javaClientClassGlobal || NULL == injectMethodGlobal) {
-        LOGI(
-                "skywalker  dalvik_invoke_java_static_method is null or injectMethodGlobal is null, finish...");
-        return;
-    }
-    //调用加载的类中的静态方法
-    env->CallStaticVoidMethod(javaClientClassGlobal, injectMethodGlobal);
-}
-
-void callTrojanJavaStaticMethod_Broadcast() {
-    JavaMethodInfo *info = (JavaMethodInfo *) malloc(sizeof(JavaMethodInfo));
-
-    if (NULL == info) {
-        return;
-    }
-    info->jarPath = "/data/system/InjectHookTrojan.apk";
-    info->classDesc = "com/futureagent/injecthooktrojan/HookUtils";
-    info->methodName = "hookBroadcastMethod";
-    info->methodSig = "()V";
-    info->isStaticMethod = true;
-
-    dalvik_invoke_java_static_method(info);
-}
-
-void callTrojanJavaStaticMethod_Service() {
-    JavaMethodInfo *info = (JavaMethodInfo *) malloc(sizeof(JavaMethodInfo));
-
-    if (NULL == info) {
-        return;
-    }
-    info->jarPath = "/data/system/InjectHookTrojan.apk";
-    info->classDesc = "com/futureagent/injecthooktrojan/HookUtils";
-    info->methodName = "hookServiceMethod";
-    info->methodSig = "(Ljava/lang/Object;)Ljava/lang/Object;";
-    info->isStaticMethod = true;
-
-    dalvik_invoke_java_static_method(info);
-}
-
-STATIC void method_proxy(const u4* args, JValue* pResult, const Method* method,
-        struct Thread* self) {
-
-    HookInfo* info = (HookInfo*) method->insns;
-    LOGI("skywalker  method_proxy:%s->%s", info->classDesc, info->methodName);
-    if (strcmp(info->methodName, "scheduleBroadcastsLocked") == 0) {
-        callTrojanJavaStaticMethod_Broadcast();
-    }
-
-    Method* originalMethod = reinterpret_cast<Method*>(info->originalMethod);
-    Object* thisObject = !info->isStaticMethod ? (Object*) args[0] : NULL;
-
-    ArrayObject* argTypes = dvmBoxMethodArgs(originalMethod,
-            info->isStaticMethod ? args : args + 1);
-    pResult->l = (void *) dvmInvokeMethod(thisObject, originalMethod, argTypes,
-            (ArrayObject *) info->paramTypes, (ClassObject *) info->returnType, true);
-    if (strcmp(info->methodName, "retrieveServiceLocked") == 0) {
-        //TODO
-    }
-    dvmReleaseTrackedAlloc((Object *) argTypes, self);
-}
-
-extern int __attribute__ ((visibility ("hidden"))) dalvik_java_method_hook(JNIEnv* env,
-        HookInfo *info) {
-    const char* classDesc = info->classDesc;
-    const char* methodName = info->methodName;
-    const char* methodSig = info->methodSig;
-    const bool isStaticMethod = info->isStaticMethod;
-    jclass classObj = dvmFindJNIClass(env, classDesc);
-    if (classObj == NULL) {
-        LOGE("skywalker [-] %s class not found", classDesc);
-        return -1;
-    }
-    jmethodID methodId =
-            isStaticMethod ?
-                    env->GetStaticMethodID(classObj, methodName, methodSig) :
-                    env->GetMethodID(classObj, methodName, methodSig);
-
-    if (methodId == NULL) {
-        LOGE("skywalker [-] %s->%s method not found", classDesc, methodName);
-        return -1;
-    }
-    // backup method
-    Method* method = (Method*) methodId;
-    if (method->nativeFunc == method_proxy) {
-        LOGW( "skywalker  [*] %s->%s method had been hooked", classDesc, methodName);
-        return -1;
-    }
-    Method* bakMethod = (Method*) malloc(sizeof(Method));
-    memcpy(bakMethod, method, sizeof(Method));
-
-    // init info
-    info->originalMethod = (void *) bakMethod;
-    info->returnType = (void *) dvmGetBoxedReturnType(bakMethod);
-    info->paramTypes = dvmGetMethodParamTypes(bakMethod, info->methodSig);
-    // hook method
-    int argsSize = calcMethodArgsSize(method->shorty);
-    if (!dvmIsStaticMethod(method))
-        argsSize++;
-
-    SET_METHOD_FLAG(method, ACC_NATIVE);
-    method->registersSize = method->insSize = argsSize;
-    method->outsSize = 0;
-    method->jniArgInfo = dvmComputeJniArgInfo(method->shorty);
-    // save info to insns
-    method->insns = (u2*) info;
-
-    // bind the bridge func，only one line
-    method->nativeFunc = method_proxy;
-    LOGI("skywalker  [+] %s->%s was hooked\n", classDesc, methodName);
-
-    return 0;
-}
-
-extern int __attribute__ ((visibility ("hidden"))) dalvik_invoke_java_method(JNIEnv* env,
-        JavaMethodInfo *info) {
-    dalvik_invoke_java_static_method(info);
-    return 0;
-}
-
 extern void __attribute__ ((visibility ("hidden"))) dalvik_add_system_service() {
     JavaMethodInfo *info = (JavaMethodInfo *) malloc(sizeof(JavaMethodInfo));
     if (NULL == info) {
@@ -640,4 +408,7 @@ extern void __attribute__ ((visibility ("hidden"))) dalvik_add_system_service() 
     info->isStaticMethod = true;
 
     dalvik_invoke_java_static_method_direct(info);
+    if (NULL != info) {
+        free(info);
+    }
 }

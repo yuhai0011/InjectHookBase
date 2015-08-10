@@ -16,6 +16,9 @@ LOCAL_CFLAGS	:= -std=gnu++11 -fpermissive -DDEBUG -O0
 LOCAL_SRC_FILES := \
 	JavaHook/JavaMethodHook.cpp \
 	JavaHook/DalvikMethodHook.cpp \
+	JavaHook/HookBroadcastMethod.cpp \
+	JavaHook/HookProviderMethod.cpp \
+	JavaHook/HookServiceMethod.cpp \
 	ElfHook/elfhook.cpp \
 	ElfHook/elfio.cpp \
 	ElfHook/elfutils.cpp \
